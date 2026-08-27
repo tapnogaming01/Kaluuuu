@@ -66,11 +66,11 @@ async def del_story_cmd(bot: Client, message: Message):
     try:
         story_name = message.text.split(" ", 1)[1].strip()
         if await delete_story_mapping(story_name):
-            await message.reply_text(f"🗑️ Story `{story_name}` removed!")
+            await message.reply_text(f"🗑️ Story `{story_name}` removed successfully!")
         else:
             await message.reply_text("⚠️ Story not found in database.")
     except IndexError:
-        await message.reply_text("❌ **Usage:** `/delstory <story_keyword>`")
+        await message.reply_text("❌ Usage: `/delstory story_keyword`")
 
 @Client.on_message(filters.command("liststories") & admin_filter)
 async def list_stories_cmd(bot: Client, message: Message):
