@@ -21,7 +21,7 @@ def parse_episodes(text: str):
 @Client.on_message(filters.chat(config.SOURCE_CHANNEL) & (filters.document | filters.audio))
 async def source_channel_handler(bot: Client, message: Message):
     try:
-        # Safe caption / title extraction (Fixes AttributeError)
+        # Safe extraction of Caption / File Name / Audio Title (Fixes AttributeError)
         caption = message.caption or ""
         if not caption and message.document:
             caption = message.document.file_name or ""
@@ -38,7 +38,7 @@ async def source_channel_handler(bot: Client, message: Message):
         target_channel_id = int(story['target_chat_id'])
         threshold = int(story['threshold'])
 
-        # 1. DB Channel में सबसे पहले Copy करो (यह कभी फेल नहीं होगा)
+        # 1. DB Channel में मैसेज कॉपी करें
         saved_msg = await message.copy(config.DB_CHANNEL)
 
         start_ep, end_ep = parse_episodes(caption)
@@ -60,7 +60,7 @@ async def source_channel_handler(bot: Client, message: Message):
                 )
                 await send_log(bot, f"🚀 **Combined File Posted:** `{story_key}` (Eps {start_ep}-{end_ep}) in `{target_channel_id}`")
             except Exception as post_err:
-                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` posting failed")
+                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` Single/Combined Posting Failed")
             return
 
         # 3. Single Episode Case: Add to Buffer
@@ -88,7 +88,7 @@ async def source_channel_handler(bot: Client, message: Message):
                 await send_log(bot, f"📦 **Batch Posted:** `{story_key}` ({len(msg_ids)} Files) in `{target_channel_id}`")
                 await clear_buffer(story_key)
             except Exception as post_err:
-                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` batch post failed")
+                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` Batch Posting Failed")
 
     except Exception as e:
         await send_error_log(bot, e, "Source Channel Handler Error")
