@@ -21,7 +21,13 @@ def parse_episodes(text: str):
 @Client.on_message(filters.chat(config.SOURCE_CHANNEL) & (filters.document | filters.audio))
 async def source_channel_handler(bot: Client, message: Message):
     try:
-        caption = message.caption or message.document.file_name or (message.audio.title if message.audio else "") or ""
+        # Safe caption / title extraction (Fixes AttributeError)
+        caption = message.caption or ""
+        if not caption and message.document:
+            caption = message.document.file_name or ""
+        elif not caption and message.audio:
+            caption = message.audio.title or message.audio.file_name or ""
+
         story = await find_story_by_caption(caption)
         
         if not story:
@@ -32,40 +38,36 @@ async def source_channel_handler(bot: Client, message: Message):
         target_channel_id = int(story['target_chat_id'])
         threshold = int(story['threshold'])
 
-        # 🔍 Target Channel access verify & entity caching (Fixes PeerIdInvalid)
-        try:
-            target_chat = await bot.get_chat(target_channel_id)
-            target_channel_id = target_chat.id
-        except Exception as chat_err:
-            await send_error_log(bot, chat_err, f"Target Channel `{target_channel_id}` Not Accessible")
-            return
-
-        start_ep, end_ep = parse_episodes(caption)
+        # 1. DB Channel में सबसे पहले Copy करो (यह कभी फेल नहीं होगा)
         saved_msg = await message.copy(config.DB_CHANNEL)
 
+        start_ep, end_ep = parse_episodes(caption)
         is_multi_ep = (start_ep is not None and end_ep is not None and end_ep > start_ep)
 
-        # 1. Combined Audio File Case (e.g., 1-10 episodes in single file)
+        # 2. Combined Audio File Case (e.g., 1-10 episodes in single file)
         if is_multi_ep:
             batch_link = f"https://t.me/{config.BOT_USERNAME}?start=file_{saved_msg.id}"
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton(f"🎧 Listen Eps {start_ep}-{end_ep} ↗️", url=batch_link)],
                 [InlineKeyboardButton("TUTORIAL ↗️", url="https://t.me/your_tutorial"), InlineKeyboardButton("HELP ↗️", url="https://t.me/your_help")]
             ])
-            await bot.send_message(
-                chat_id=target_channel_id,
-                text=f"<b>{story_key.title()}</b>\n\n<b>MMH EPS {start_ep} - {end_ep}</b>",
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML
-            )
-            await send_log(bot, f"🚀 **Combined File Posted:** `{story_key}` (Eps {start_ep}-{end_ep}) in `{target_chat.title}`")
+            try:
+                await bot.send_message(
+                    chat_id=target_channel_id,
+                    text=f"<b>{story_key.title()}</b>\n\n<b>MMH EPS {start_ep} - {end_ep}</b>",
+                    reply_markup=keyboard,
+                    parse_mode=ParseMode.HTML
+                )
+                await send_log(bot, f"🚀 **Combined File Posted:** `{story_key}` (Eps {start_ep}-{end_ep}) in `{target_channel_id}`")
+            except Exception as post_err:
+                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` posting failed")
             return
 
-        # 2. Single Episode Case: Add to Buffer
+        # 3. Single Episode Case: Add to Buffer
         await add_to_buffer(story_key, saved_msg.id, start_ep)
         msg_ids, ep_nums = await get_buffer(story_key)
 
-        # 3. Post when Buffer Threshold is Reached
+        # 4. Post when Buffer Threshold is Reached
         if len(msg_ids) >= threshold:
             first_ep = ep_nums[0] if ep_nums and ep_nums[0] else "Start"
             last_ep = ep_nums[-1] if ep_nums and ep_nums[-1] else "End"
@@ -76,14 +78,17 @@ async def source_channel_handler(bot: Client, message: Message):
                 [InlineKeyboardButton("TUTORIAL ↗️", url="https://t.me/your_tutorial"), InlineKeyboardButton("HELP ↗️", url="https://t.me/your_help")]
             ])
 
-            await bot.send_message(
-                chat_id=target_channel_id,
-                text=f"<b>{story_key.title()}</b>\n\n<b>EPISODES {first_ep} - {last_ep}</b>",
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML
-            )
-            await send_log(bot, f"📦 **Batch Posted:** `{story_key}` ({len(msg_ids)} Files) in `{target_chat.title}`")
-            await clear_buffer(story_key)
+            try:
+                await bot.send_message(
+                    chat_id=target_channel_id,
+                    text=f"<b>{story_key.title()}</b>\n\n<b>EPISODES {first_ep} - {last_ep}</b>",
+                    reply_markup=keyboard,
+                    parse_mode=ParseMode.HTML
+                )
+                await send_log(bot, f"📦 **Batch Posted:** `{story_key}` ({len(msg_ids)} Files) in `{target_channel_id}`")
+                await clear_buffer(story_key)
+            except Exception as post_err:
+                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` batch post failed")
 
     except Exception as e:
         await send_error_log(bot, e, "Source Channel Handler Error")
