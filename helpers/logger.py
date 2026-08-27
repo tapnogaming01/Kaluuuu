@@ -3,9 +3,17 @@ from pyrogram import Client
 from pyrogram.enums import ParseMode
 import config
 
+async def resolve_peer_safe(bot: Client, chat_id: int):
+    """Pyrogram memory me channel details load karta hai taaki PeerIdInvalid na aaye"""
+    try:
+        await bot.get_chat(chat_id)
+    except Exception:
+        pass
+
 async def send_log(bot: Client, text: str):
     try:
         log_channel = int(config.LOG_CHANNEL)
+        await resolve_peer_safe(bot, log_channel)
         await bot.send_message(
             chat_id=log_channel, 
             text=text, 
@@ -17,7 +25,6 @@ async def send_log(bot: Client, text: str):
 
 async def send_error_log(bot: Client, error: Exception, context: str = ""):
     tb = traceback.format_exc()
-    # Traceback ke backticks ko clean karein taaki Markdown crash na ho
     clean_tb = tb.replace("`", "'")[-1000:]
     
     error_text = (
@@ -29,12 +36,11 @@ async def send_error_log(bot: Client, error: Exception, context: str = ""):
     )
     try:
         log_channel = int(config.LOG_CHANNEL)
+        await resolve_peer_safe(bot, log_channel)
         await bot.send_message(
             chat_id=log_channel, 
             text=error_text,
             parse_mode=ParseMode.MARKDOWN
         )
     except Exception as e:
-        # Agar Telegram Log Channel fail ho toh Render Console me print karein
-        print(f"❌ [Console Log Error] Failed to send error log to Telegram: {e}")
-        print(f"Original Error in '{context}': {error}\nTraceback:\n{tb}")
+        print(f"❌ [Console Log Error] Telegram Log Failed: {e}\nContext: {context}\nError: {error}\nTraceback:\n{tb}")
