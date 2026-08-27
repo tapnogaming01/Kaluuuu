@@ -21,7 +21,7 @@ def parse_episodes(text: str):
 @Client.on_message(filters.chat(config.SOURCE_CHANNEL) & (filters.document | filters.audio))
 async def source_channel_handler(bot: Client, message: Message):
     try:
-        # Safe extraction of Caption / File Name / Audio Title (Fixes AttributeError)
+        # Safe extraction of Caption / Title
         caption = message.caption or ""
         if not caption and message.document:
             caption = message.document.file_name or ""
@@ -36,15 +36,29 @@ async def source_channel_handler(bot: Client, message: Message):
 
         story_key = story['story_key']
         target_channel_id = int(story['target_chat_id'])
+        db_channel_id = int(config.DB_CHANNEL)
         threshold = int(story['threshold'])
 
-        # 1. DB Channel में मैसेज कॉपी करें
-        saved_msg = await message.copy(config.DB_CHANNEL)
+        # 🔍 DB Channel Peer Resolution (PeerIdInvalid fix)
+        try:
+            await bot.get_chat(db_channel_id)
+        except Exception as db_peer_err:
+            await send_error_log(bot, db_peer_err, f"DB Channel `{db_channel_id}` Access Failed")
+            return
+
+        # 1. DB Channel में फ़ाइल कॉपी करें
+        saved_msg = await message.copy(db_channel_id)
 
         start_ep, end_ep = parse_episodes(caption)
         is_multi_ep = (start_ep is not None and end_ep is not None and end_ep > start_ep)
 
-        # 2. Combined Audio File Case (e.g., 1-10 episodes in single file)
+        # 🔍 Target Channel Peer Resolution
+        try:
+            await bot.get_chat(target_channel_id)
+        except Exception as target_peer_err:
+            await send_error_log(bot, target_peer_err, f"Target Channel `{target_channel_id}` Access Failed")
+
+        # 2. Combined Audio File Case
         if is_multi_ep:
             batch_link = f"https://t.me/{config.BOT_USERNAME}?start=file_{saved_msg.id}"
             keyboard = InlineKeyboardMarkup([
@@ -60,7 +74,7 @@ async def source_channel_handler(bot: Client, message: Message):
                 )
                 await send_log(bot, f"🚀 **Combined File Posted:** `{story_key}` (Eps {start_ep}-{end_ep}) in `{target_channel_id}`")
             except Exception as post_err:
-                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` Single/Combined Posting Failed")
+                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` Post Error")
             return
 
         # 3. Single Episode Case: Add to Buffer
@@ -88,7 +102,7 @@ async def source_channel_handler(bot: Client, message: Message):
                 await send_log(bot, f"📦 **Batch Posted:** `{story_key}` ({len(msg_ids)} Files) in `{target_channel_id}`")
                 await clear_buffer(story_key)
             except Exception as post_err:
-                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` Batch Posting Failed")
+                await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` Batch Post Error")
 
     except Exception as e:
         await send_error_log(bot, e, "Source Channel Handler Error")
