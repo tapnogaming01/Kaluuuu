@@ -26,22 +26,26 @@ bot = Client(
     plugins=dict(root="plugins")
 )
 
+async def cache_peer_safe(chat_id):
+    try:
+        await bot.get_chat(int(chat_id))
+        print(f"✅ Cached peer: {chat_id}")
+    except Exception as e:
+        print(f"⚠️ Failed to cache {chat_id}: {e}")
+
 async def main():
     await start_web_server()
     print("🤖 Starting Telegram Bot...")
     await bot.start()
     print("✅ Bot is active and running!")
 
-    # 🔑 Peer ID Cache Fix: Re-fetch dialogs so Pyrogram resolves all channel IDs
-    print("🔄 Caching channel peers...")
-    try:
-        async for dialog in bot.get_dialogs():
-            pass
-        print("✅ All channel peers cached successfully!")
-    except Exception as e:
-        print(f"⚠️ Peer caching error: {e}")
+    # 🔑 Bot Safe Peer Cache: get_chat use karein
+    print("🔄 Caching channels...")
+    await cache_peer_safe(config.DB_CHANNEL)
+    await cache_peer_safe(config.LOG_CHANNEL)
+    if hasattr(config, "SOURCE_CHANNEL"):
+        await cache_peer_safe(config.SOURCE_CHANNEL)
 
-    # Keep bot running safely using Pyrogram idle
     await idle()
     await bot.stop()
 
