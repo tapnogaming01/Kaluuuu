@@ -1,6 +1,6 @@
 import asyncio
 from aiohttp import web
-from pyrogram import Client
+from pyrogram import Client, idle
 import config
 
 routes = web.RouteTableDef()
@@ -31,7 +31,19 @@ async def main():
     print("🤖 Starting Telegram Bot...")
     await bot.start()
     print("✅ Bot is active and running!")
-    await asyncio.Event().wait()
+
+    # 🔑 Peer ID Cache Fix: Re-fetch dialogs so Pyrogram resolves all channel IDs
+    print("🔄 Caching channel peers...")
+    try:
+        async for dialog in bot.get_dialogs():
+            pass
+        print("✅ All channel peers cached successfully!")
+    except Exception as e:
+        print(f"⚠️ Peer caching error: {e}")
+
+    # Keep bot running safely using Pyrogram idle
+    await idle()
+    await bot.stop()
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
