@@ -18,41 +18,53 @@ def parse_episodes(text: str):
         return start_ep, end_ep
     return None, None
 
-@Client.on_message(filters.chat(config.SOURCE_CHANNEL) & (filters.document | filters.audio))
+# SOURCE_CHANNEL ID ko safe Integer me convert karein
+try:
+    SOURCE_CHAT_ID = int(config.SOURCE_CHANNEL)
+except Exception:
+    SOURCE_CHAT_ID = config.SOURCE_CHANNEL
+
+# Dynamic Filter: Document, Audio, Video, Voice sabhi cover karein
+@Client.on_message(filters.chat(SOURCE_CHAT_ID) & (filters.document | filters.audio | filters.video | filters.voice))
 async def source_channel_handler(bot: Client, message: Message):
+    print(f"📥 [Source Channel] New File Received! Message ID: {message.id}")
     try:
-        # Safe extraction of Caption / Title
+        db_channel_id = int(config.DB_CHANNEL)
+        
+        # Peer cache Warm-up for DB Channel
+        try:
+            await bot.get_chat(db_channel_id)
+        except Exception:
+            pass
+
+        # 1. Sabse pehle DB Channel me file COPY karein (Bina kisi condition ke)
+        saved_msg = await message.copy(db_channel_id)
+        print(f"✅ [DB Channel] File copied successfully! New DB Msg ID: {saved_msg.id}")
+
+        # Caption safe extraction
         caption = message.caption or ""
         if not caption and message.document:
             caption = message.document.file_name or ""
         elif not caption and message.audio:
             caption = message.audio.title or message.audio.file_name or ""
+        elif not caption and message.video:
+            caption = message.video.file_name or ""
 
         story = await find_story_by_caption(caption)
         
         if not story:
-            await send_log(bot, f"⚠️ **Unmapped File Received:** Caption: `{caption[:80]}`")
+            print(f"⚠️ Story mapping not found for caption: '{caption}'")
+            await send_log(bot, f"⚠️ **Unmapped File Received & Saved to DB:** Caption: `{caption[:80]}`")
             return
 
         story_key = story['story_key']
         target_channel_id = int(story['target_chat_id'])
-        db_channel_id = int(config.DB_CHANNEL)
         threshold = int(story['threshold'])
-
-        # 🔍 DB Channel Peer Resolution (PeerIdInvalid fix)
-        try:
-            await bot.get_chat(db_channel_id)
-        except Exception as db_peer_err:
-            await send_error_log(bot, db_peer_err, f"DB Channel `{db_channel_id}` Access Failed")
-            return
-
-        # 1. DB Channel में फ़ाइल कॉपी करें
-        saved_msg = await message.copy(db_channel_id)
 
         start_ep, end_ep = parse_episodes(caption)
         is_multi_ep = (start_ep is not None and end_ep is not None and end_ep > start_ep)
 
-        # 🔍 Target Channel Peer Resolution
+        # Target Channel Peer Cache Resolution
         try:
             await bot.get_chat(target_channel_id)
         except Exception as target_peer_err:
@@ -105,4 +117,5 @@ async def source_channel_handler(bot: Client, message: Message):
                 await send_error_log(bot, post_err, f"Target Channel `{target_channel_id}` Batch Post Error")
 
     except Exception as e:
+        print(f"❌ Source Channel Handler Exception: {e}")
         await send_error_log(bot, e, "Source Channel Handler Error")
