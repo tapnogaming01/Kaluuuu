@@ -1,6 +1,7 @@
 import re
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.enums import ParseMode
 import config
 from database import find_story_by_caption, add_to_buffer, get_buffer, clear_buffer
 from helpers.logger import send_log, send_error_log
@@ -20,7 +21,7 @@ def parse_episodes(text: str):
 @Client.on_message(filters.chat(config.SOURCE_CHANNEL) & (filters.document | filters.audio))
 async def source_channel_handler(bot: Client, message: Message):
     try:
-        caption = message.caption or message.document.file_name or message.audio.title or ""
+        caption = message.caption or message.document.file_name or (message.audio.title if message.audio else "") or ""
         story = await find_story_by_caption(caption)
         
         if not story:
@@ -28,8 +29,16 @@ async def source_channel_handler(bot: Client, message: Message):
             return
 
         story_key = story['story_key']
-        target_channel_id = story['target_chat_id']
-        threshold = story['threshold']
+        target_channel_id = int(story['target_chat_id'])
+        threshold = int(story['threshold'])
+
+        # 🔍 Target Channel access verify & entity caching (Fixes PeerIdInvalid)
+        try:
+            target_chat = await bot.get_chat(target_channel_id)
+            target_channel_id = target_chat.id
+        except Exception as chat_err:
+            await send_error_log(bot, chat_err, f"Target Channel `{target_channel_id}` Not Accessible")
+            return
 
         start_ep, end_ep = parse_episodes(caption)
         saved_msg = await message.copy(config.DB_CHANNEL)
@@ -46,9 +55,10 @@ async def source_channel_handler(bot: Client, message: Message):
             await bot.send_message(
                 chat_id=target_channel_id,
                 text=f"<b>{story_key.title()}</b>\n\n<b>MMH EPS {start_ep} - {end_ep}</b>",
-                reply_markup=keyboard
+                reply_markup=keyboard,
+                parse_mode=ParseMode.HTML
             )
-            await send_log(bot, f"🚀 **Combined File Posted:** `{story_key}` (Eps {start_ep}-{end_ep}) in `{target_channel_id}`")
+            await send_log(bot, f"🚀 **Combined File Posted:** `{story_key}` (Eps {start_ep}-{end_ep}) in `{target_chat.title}`")
             return
 
         # 2. Single Episode Case: Add to Buffer
@@ -69,9 +79,10 @@ async def source_channel_handler(bot: Client, message: Message):
             await bot.send_message(
                 chat_id=target_channel_id,
                 text=f"<b>{story_key.title()}</b>\n\n<b>EPISODES {first_ep} - {last_ep}</b>",
-                reply_markup=keyboard
+                reply_markup=keyboard,
+                parse_mode=ParseMode.HTML
             )
-            await send_log(bot, f"📦 **Batch Posted:** `{story_key}` ({len(msg_ids)} Files) in `{target_channel_id}`")
+            await send_log(bot, f"📦 **Batch Posted:** `{story_key}` ({len(msg_ids)} Files) in `{target_chat.title}`")
             await clear_buffer(story_key)
 
     except Exception as e:
