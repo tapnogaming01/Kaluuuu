@@ -8,9 +8,9 @@ BOT_USERNAME = os.environ.get("BOT_USERNAME", "YourBotUsername")
 
 # Database & Channel Settings
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb+srv://...")
-SOURCE_CHANNEL = int(os.environ.get("SOURCE_CHANNEL", "-1001234567890"))
-DB_CHANNEL = int(os.environ.get("DB_CHANNEL", "-1009876543210"))
-LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1001122334455"))
+SOURCE_CHANNEL = int(os.environ.get("SOURCE_CHANNEL", "-1004477265073"))
+DB_CHANNEL = int(os.environ.get("DB_CHANNEL", "-1003882908020"))
+LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1003814751875"))
 
 # Admins List (Comma Separated IDs)
 ADMINS = [int(x) for x in os.environ.get("ADMINS", "123456789").split()]
