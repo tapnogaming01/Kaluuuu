@@ -80,7 +80,7 @@ async def source_channel_handler(bot: Client, message: Message):
             try:
                 await bot.send_message(
                     chat_id=target_channel_id,
-                    text=f"<b>{story_key.title()}</b>\n\n<b>MMH EPS {start_ep} - {end_ep}</b>",
+                    text=f"<b>{story_key.title()}</b>\n\n<b>EPS {start_ep} - {end_ep}</b>",
                     reply_markup=keyboard,
                     parse_mode=ParseMode.HTML
                 )
