@@ -41,21 +41,33 @@ async def start_handler(bot: Client, message: Message):
         param = message.command[1]
 
         # 2. Verification Token Pass Handler
+        # अगर पैरामीटर 'verify_' से शुरू होता है तो ओरिजिनल फाइल ID निकालें
         if param.startswith("verify_"):
             verify_hours = s.get("verify_expire_hours", 12)
             await set_user_verified(user_id, hours=verify_hours)
             await send_log(bot, f"✅ **User Verified:** {message.from_user.mention} (`{user_id}`)")
-            return await message.reply_text(
-                f"🎉 **Verification Successful!**\n\n"
-                f"Your file access is active for the next **{verify_hours} Hours**. Click your episode link again to receive files!"
-            )
+            
+            # verify_USERID_file_1234 से असली फाइल पैरामीटर निकालें
+            parts = param.split("_", 2)
+            if len(parts) > 2:
+                param = parts[2]  # अब param बन जाएगा 'file_1234' या 'batch_10_20'
+                await message.reply_text(
+                    f"🎉 **Verification Successful!**\n\n"
+                    f"Your file access is active for **{verify_hours} Hours**. Sending your files now..."
+                )
+            else:
+                return await message.reply_text(
+                    f"🎉 **Verification Successful!**\n\n"
+                    f"Your file access is active for the next **{verify_hours} Hours**. Click your episode link again to receive files!"
+                )
 
         # 3. Shortener Verification Status Check
         is_verify_enabled = s.get("shortener_verify_enabled", True)
         if is_verify_enabled and s.get("shortener_api"):
             is_verified = await is_user_verified(user_id)
             if not is_verified:
-                raw_verify_link = f"https://t.me/{config.BOT_USERNAME}?start=verify_{user_id}"
+                # ओरिजिनल param (file_xx या batch_xx) को वेरिफिकेशन लिंक में अटैच करें
+                raw_verify_link = f"https://t.me/{config.BOT_USERNAME}?start=verify_{user_id}_{param}"
                 short_url = await get_short_url(raw_verify_link)
 
                 btn = InlineKeyboardMarkup([
@@ -110,7 +122,7 @@ async def start_handler(bot: Client, message: Message):
 
         await send_log(
             bot,
-            f"📥 **Files Delivered:** {len(sent_messages)-1 if is_auto_del else len(sent_messages)} files sent to {message.from_user.mention} (`{user_id}`).\n"
+            f"📥 **Files Delivered:** {len(sent_messages)-1 if is_auto_del and sent_messages else len(sent_messages)} files sent to {message.from_user.mention} (`{user_id}`).\n"
             f"🔒 Content Protection: `{is_protect}` | ⏳ Auto-Delete: `{del_min} min`"
         )
 
