@@ -47,6 +47,8 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
             clean_path = channel_val.split("t.me/")[-1].replace("@", "").strip()
             if not clean_path.startswith("+") and not clean_path.startswith("joinchat/"):
                 chat_identifier = f"@{clean_path.split('/')[0]}"
+            else:
+                chat_identifier = channel_val
         elif channel_val.startswith("@"):
             chat_identifier = channel_val
         else:
@@ -55,8 +57,19 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
         if not chat_identifier:
             continue
 
-        # 2. Join Link Generator Helper
-        if "http" in channel_val:
+        # 2. Join Link Generator (Private vs Public Support)
+        join_url = None
+        if isinstance(chat_identifier, int) or (isinstance(channel_val, str) and channel_val.startswith("-100")):
+            try:
+                chat_info = await bot.get_chat(chat_identifier)
+                if chat_info.invite_link:
+                    join_url = chat_info.invite_link
+                else:
+                    join_url = await bot.export_chat_invite_link(chat_identifier)
+            except Exception as e:
+                print(f"⚠️ Failed to export invite link for {chat_identifier}: {e}")
+                join_url = "https://t.me/"
+        elif "http" in channel_val:
             join_url = channel_val
         else:
             clean_username = str(chat_identifier).replace("@", "")
