@@ -15,6 +15,12 @@ LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "-1003814751875"))
 # Admins List (Comma Separated IDs)
 ADMINS = [int(x) for x in os.environ.get("ADMINS", "123456789").split()]
 
+# Force Subscribe Channels Default Fallbacks
+FSUB_CHANNEL_1 = os.environ.get("FSUB_CHANNEL_1", "https://t.me/freestoryhubMR")
+FSUB_CHANNEL_2 = os.environ.get("FSUB_CHANNEL_2", "https://t.me/freestoryhubMR")
+FSUB_CHANNEL_3 = os.environ.get("FSUB_CHANNEL_3", "https://t.me/freestoryhubMR")
+FSUB_CHANNEL_4 = os.environ.get("FSUB_CHANNEL_4", "https://t.me/freestoryhubMR")
+
 # Web Server Port for Render / Koyeb
 PORT = int(os.environ.get("PORT", "8080"))
 
@@ -31,6 +37,7 @@ SHORTENER_URL = os.environ.get("SHORTENER_URL", "gplinks.in")
 SHORTENER_API = os.environ.get("SHORTENER_API", "")
 
 # Anti-Bypass Security Credentials
-SECRET_KEY = os.environ.get("SECRET_KEY", "Kaluu_Secret_Key_2026") # यहाँ अपना नाम या Secret Key डाल सकते हैं
-# update channel 
-UPDATES_CHANNEL = "https://t.me/freestoryhubMR"  
+SECRET_KEY = os.environ.get("SECRET_KEY", "Kaluu_Secret_Key_2026") # Secret Key
+
+# Updates Channel
+UPDATES_CHANNEL = os.environ.get("UPDATES_CHANNEL", "https://t.me/freestoryhubMR")
