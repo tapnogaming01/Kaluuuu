@@ -28,7 +28,7 @@ from helpers.verification import (
 CANCEL_TASKS = {}
 
 
-# 🔄 Helper Function: Robust Force Subscribe Checker
+# 🔄 Helper Function: Robust Force Subscribe Checker (Public & Private Supported)
 async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
     unjoined_buttons = []
     
@@ -39,6 +39,7 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
         
         channel_val = str(channel_val).strip()
 
+        # 1. Chat Identifier Extract Logic
         chat_identifier = None
         if channel_val.startswith("-100") or channel_val.lstrip("-").isdigit():
             chat_identifier = int(channel_val)
@@ -54,13 +55,22 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
         if not chat_identifier:
             continue
 
+        # 2. Join Link Generator Helper
+        if "http" in channel_val:
+            join_url = channel_val
+        else:
+            clean_username = str(chat_identifier).replace("@", "")
+            join_url = f"https://t.me/{clean_username}"
+
+        # 3. Membership Check
         try:
             member = await bot.get_chat_member(chat_id=chat_identifier, user_id=user_id)
             if member.status in ["left", "kicked"]:
-                unjoined_buttons.append([InlineKeyboardButton(f"📢 ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ {i}", url=channel_val if "http" in channel_val else f"https://t.me/{chat_identifier.replace('@','')}")])
+                unjoined_buttons.append([InlineKeyboardButton(f"📢 ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ {i}", url=join_url)])
         except UserNotParticipant:
-            unjoined_buttons.append([InlineKeyboardButton(f"📢 ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ {i}", url=channel_val if "http" in channel_val else f"https://t.me/{chat_identifier.replace('@','')}")])
-        except Exception:
+            unjoined_buttons.append([InlineKeyboardButton(f"📢 ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ {i}", url=join_url)])
+        except Exception as e:
+            print(f"⚠️ FSUB Check Error (Channel {i}): {e}")
             pass
 
     return unjoined_buttons
@@ -113,12 +123,19 @@ async def start_handler(bot: Client, message: Message):
 
         # 2. Normal /start Command
         if len(message.command) < 2:
+            main_buttons = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="help_btn"),
+                    InlineKeyboardButton("ℹ️ ᴀʙᴏᴜᴛ", callback_data="about_btn")
+                ],
+                [
+                    InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/pratilipifm0900")),
+                    InlineKeyboardButton("💬 ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/pratilipifm0900")
+                ]
+            ])
             return await message.reply_text(
                 Script.START_TXT.format(first_name=message.from_user.first_name),
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/pratilipifm0900"))],
-                    [InlineKeyboardButton("❓ ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/pratilipifm0900")]
-                ])
+                reply_markup=main_buttons
             )
 
         raw_param = message.command[1]
@@ -197,14 +214,29 @@ async def start_handler(bot: Client, message: Message):
         await message.reply_text("❌ ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ ꜰᴇᴛᴄʜɪɴɢ ʏᴏᴜʀ ꜰɪʟᴇꜱ.")
 
 
-# 🔄 Updated File Delivery Helper with Developer & Cancel Support
+# ❓ Command Handlers for /help & /about
+@Client.on_message(filters.command("help") & filters.private)
+async def help_handler(bot: Client, message: Message):
+    btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start")]])
+    await message.reply_text(Script.HELP_TXT, reply_markup=btn)
+
+
+@Client.on_message(filters.command("about") & filters.private)
+async def about_handler(bot: Client, message: Message):
+    btn = InlineKeyboardMarkup([
+        [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/Kaluu")],
+        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start")]
+    ])
+    await message.reply_text(Script.ABOUT_TXT, reply_markup=btn, disable_web_page_preview=True)
+
+
+# 🔄 Updated File Delivery Helper
 async def process_file_delivery(bot: Client, message: Message, param: str, settings: dict):
     user_id = message.from_user.id
     sent_messages = []
     is_protect = settings.get("protect_content", True)
     
-    # Buttons Structure
-    dev_url = "https://t.me/kcxry"
+    dev_url = "https://t.me/Kaluu"
     wait_buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url=dev_url)],
         [InlineKeyboardButton("❌ ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_dl#{user_id}")]
@@ -215,7 +247,6 @@ async def process_file_delivery(bot: Client, message: Message, param: str, setti
         reply_markup=wait_buttons
     )
 
-    # Reset Cancel State
     CANCEL_TASKS[user_id] = False
 
     try:
@@ -224,7 +255,6 @@ async def process_file_delivery(bot: Client, message: Message, param: str, setti
             start_id, end_id = int(parts[1]), int(parts[2])
             
             for m_id in range(start_id, end_id + 1):
-                # Check for Cancellation
                 if CANCEL_TASKS.get(user_id, False):
                     await status_msg.edit_text(Script.CANCELLED_TXT)
                     await asyncio.sleep(2)
@@ -254,16 +284,14 @@ async def process_file_delivery(bot: Client, message: Message, param: str, setti
     finally:
         CANCEL_TASKS.pop(user_id, None)
 
-    # Delete Wait Message after sending files
     try:
         await status_msg.delete()
     except Exception:
         pass
 
-    # Auto Delete Handle
     is_auto_del = settings.get("auto_delete_enabled", True)
     del_min = settings.get("auto_delete_minutes", 30)
-    channel_url = getattr(config, "UPDATES_CHANNEL", "https://t.me/your_channel")
+    channel_url = getattr(config, "UPDATES_CHANNEL", "https://t.me/pratilipifm0900")
 
     if sent_messages and is_auto_del:
         del_msg = await message.reply_text(
@@ -280,6 +308,39 @@ async def process_file_delivery(bot: Client, message: Message, param: str, setti
         f"📥 **Files Delivered:** {len(sent_messages)-1 if is_auto_del and sent_messages else len(sent_messages)} files sent to {message.from_user.mention} (`{user_id}`).\n"
         f"🔒 Content Protection: `{is_protect}` | ⏳ Auto-Delete: `{del_min} min`"
     )
+
+
+# 🔄 Callback Navigation Handler (Help, About & Back)
+@Client.on_callback_query(filters.regex(r"^(help_btn|about_btn|back_start)$"))
+async def navigation_callbacks(bot: Client, query: CallbackQuery):
+    data = query.data
+
+    if data == "help_btn":
+        btn = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start")]])
+        await query.message.edit_text(Script.HELP_TXT, reply_markup=btn)
+
+    elif data == "about_btn":
+        btn = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/Kaluu")],
+            [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start")]
+        ])
+        await query.message.edit_text(Script.ABOUT_TXT, reply_markup=btn, disable_web_page_preview=True)
+
+    elif data == "back_start":
+        main_buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="help_btn"),
+                InlineKeyboardButton("ℹ️ ᴀʙᴏᴜᴛ", callback_data="about_btn")
+            ],
+            [
+                InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/pratilipifm0900")),
+                InlineKeyboardButton("💬 ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/pratilipifm0900")
+            ]
+        ])
+        await query.message.edit_text(
+            Script.START_TXT.format(first_name=query.from_user.first_name),
+            reply_markup=main_buttons
+        )
 
 
 # 🔄 Callback Query Handler for Try Again Button
