@@ -2,7 +2,7 @@ import time
 import asyncio
 import random
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, ChatJoinRequest
 from pyrogram.errors import UserNotParticipant, ChatAdminRequired, PeerIdInvalid
 import config
 from script import Script
@@ -15,7 +15,9 @@ from database import (
     is_user_verified,
     set_user_verified,
     is_token_burned,
-    burn_token
+    burn_token,
+    add_pending_request,
+    is_request_pending
 )
 from helpers.logger import send_log, send_error_log
 from helpers.verification import (
@@ -28,7 +30,21 @@ from helpers.verification import (
 CANCEL_TASKS = {}
 
 
-# 🔄 Helper Function: Force Subscribe Checker with Approval Link Support
+# 📩 Event Handler: Catch Private Channel Join Requests and Save to DB
+@Client.on_chat_join_request()
+async def track_join_request(bot: Client, request: ChatJoinRequest):
+    try:
+        user_id = request.from_user.id
+        chat_id = request.chat.id
+        
+        # Save request to MongoDB
+        await add_pending_request(user_id, chat_id)
+        print(f"📩 Join Request Saved in DB | User: {user_id} | Chat: {chat_id}")
+    except Exception as e:
+        print(f"⚠️ Error Saving Join Request to DB: {e}")
+
+
+# 🔄 Helper Function: Force Subscribe Checker (Member or Pending Request Check)
 async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
     unjoined_buttons = []
     
@@ -61,7 +77,7 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
         join_url = None
         if isinstance(chat_identifier, int) or (isinstance(channel_val, str) and channel_val.startswith("-100")):
             try:
-                # 🛑 creates_join_request=True से Approval Invite Link जनरेट होगी
+                # 🛑 Approval Invite Link (Join Request Enabled)
                 invite_link_obj = await bot.create_chat_invite_link(
                     chat_id=chat_identifier,
                     creates_join_request=True
@@ -80,7 +96,12 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
             clean_username = str(chat_identifier).replace("@", "")
             join_url = f"https://t.me/{clean_username}"
 
-        # 3. Membership Check
+        # 3. MongoDB Pending Request Check (Bypass FSub if Request Sent)
+        if isinstance(chat_identifier, int):
+            if await is_request_pending(user_id, chat_identifier):
+                continue
+
+        # 4. Membership Check
         try:
             member = await bot.get_chat_member(chat_id=chat_identifier, user_id=user_id)
             if member.status in ["left", "kicked"]:
@@ -242,7 +263,7 @@ async def help_handler(bot: Client, message: Message):
 @Client.on_message(filters.command("about") & filters.private)
 async def about_handler(bot: Client, message: Message):
     btn = InlineKeyboardMarkup([
-        [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/Kaluu")],
+        [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/KCXRY")],
         [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start")]
     ])
     await message.reply_text(Script.ABOUT_TXT, reply_markup=btn, disable_web_page_preview=True)
