@@ -56,4 +56,4 @@ class Script:
 
     PLEASE_WAIT_TXT = "⚠️ **PLEASE WAIT**\n\nआपकी फाइल्स भेजी जा रही हैं, कृपया प्रतीक्षा करें..."
     CANCELLED_TXT = "❌ **फाइल डिलीवरी यूज़र द्वारा कैंसिल कर दी गई है!**"
-    DEV_URL = "https://t.me/hdfilm0900_bot"  # अपना डेवलपर यूजरनेम यहाँ डालें
+    
