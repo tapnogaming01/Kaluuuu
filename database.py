@@ -1,5 +1,6 @@
+import time
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import config
 
 client = AsyncIOMotorClient(config.MONGO_URL)
@@ -11,7 +12,9 @@ users_col = db['users']
 settings_col = db['bot_settings']
 used_tokens_col = db['used_tokens']  # Used/Burned Tokens for Anti-Bypass
 
+# -------------------------------------------------------------
 # 1. Global Settings Control
+# -------------------------------------------------------------
 async def get_settings():
     settings = await settings_col.find_one({"id": "global_settings"})
     if not settings:
@@ -22,7 +25,7 @@ async def get_settings():
             "auto_delete_minutes": getattr(config, "AUTO_DELETE_MINUTES", 5),
             "shortener_verify_enabled": getattr(config, "SHORTENER_VERIFY_ENABLED", True),
             "verify_expire_hours": getattr(config, "VERIFY_EXPIRE_HOURS", 12),
-            "shortener_url": getattr(config, "SHORTENER_URL", ""),
+            "shortener_url": getattr(config, "SHORTENER_URL", "gplinks.in"),
             "shortener_api": getattr(config, "SHORTENER_API", "")
         }
         await settings_col.insert_one(default_data)
@@ -36,7 +39,48 @@ async def update_settings(key: str, value):
         upsert=True
     )
 
-# 2. Story Mapping System
+# -------------------------------------------------------------
+# 2. User & Verification System (Fixes ImportError & Log Notice)
+# -------------------------------------------------------------
+async def add_user(user_id: int, name: str) -> bool:
+    """
+    यूज़र को ऐड करता है। 
+    अगर नया यूज़र है तो True रिटर्न करेगा (ताकि Log Channel में मैसेज जाए),
+    और अगर पुराना यूज़र है तो False रिटर्न करेगा।
+    """
+    user = await users_col.find_one({"user_id": user_id})
+    if not user:
+        await users_col.insert_one({
+            "user_id": user_id,
+            "name": name,
+            "is_banned": False,
+            "bypass_attempts": 0,
+            "verified_until": 0,
+            "joined_at": datetime.now(timezone.utc)
+        })
+        return True
+    return False
+
+async def is_user_verified(user_id: int) -> bool:
+    """चेक करता है कि यूज़र की वेरिफिकेशन एक्टिव है या नहीं"""
+    user = await users_col.find_one({"user_id": user_id})
+    if not user:
+        return False
+    verified_until = user.get("verified_until", 0)
+    return time.time() < verified_until
+
+async def set_user_verified(user_id: int, hours: int = 12):
+    """यूज़र को दिए गए घंटों के लिए वेरीफाई मार्क करता है"""
+    expire_time = int(time.time()) + (hours * 3600)
+    await users_col.update_one(
+        {"user_id": user_id},
+        {"$set": {"verified_until": expire_time}},
+        upsert=True
+    )
+
+# -------------------------------------------------------------
+# 3. Story Mapping System
+# -------------------------------------------------------------
 async def add_story_mapping(story_key: str, target_chat_id: int, threshold: int = 5):
     story_key = story_key.lower().strip()
     await stories_col.update_one(
@@ -66,7 +110,9 @@ async def find_story_by_caption(caption: str):
             return story
     return None
 
-# 3. Buffer System
+# -------------------------------------------------------------
+# 4. Buffer System
+# -------------------------------------------------------------
 async def add_to_buffer(story_key: str, file_msg_id: int, ep_num: int = None):
     await buffer_col.update_one(
         {"story_key": story_key},
@@ -81,7 +127,9 @@ async def get_buffer(story_key: str):
 async def clear_buffer(story_key: str):
     await buffer_col.delete_one({"story_key": story_key})
 
-# 4. Ban & Anti-Bypass Database Logic
+# -------------------------------------------------------------
+# 5. Ban & Anti-Bypass Database Logic
+# -------------------------------------------------------------
 async def is_user_banned(user_id: int) -> tuple[bool, str]:
     """चेक करता है कि यूजर बैन है या नहीं"""
     user = await users_col.find_one({"user_id": user_id})
@@ -115,7 +163,9 @@ async def unban_user(user_id: int):
         upsert=True
     )
 
-# 5. Token Burning Logic
+# -------------------------------------------------------------
+# 6. Token Burning Logic
+# -------------------------------------------------------------
 async def is_token_burned(encoded_payload: str) -> bool:
     """चेक करता है कि टोकन पहले यूज़ हो चुका है या नहीं"""
     burned = await used_tokens_col.find_one({"token": encoded_payload})
