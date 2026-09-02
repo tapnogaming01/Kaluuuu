@@ -3,6 +3,7 @@ import asyncio
 import random
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import UserNotParticipant, ChatAdminRequired, PeerIdInvalid
 import config
 from database import (
     add_user,  # ✅ DB check & add user function
@@ -28,6 +29,31 @@ FUNNY_HACKER_MESSAGES = [
     "🤖 **SYSTEM ALERT: Bypasser Spotted!** 🎯\n\n2 मिनट का रास्ता 5 सेकंड में? उड़ के गए थे क्या? ✈️\nना ना ना! चीटिंग नहीं चलेगी। टोकन Expire कर दिया गया है! 🚫\n*(Strike {strike}/3: सावधान रहें!)*"
 ]
 
+# 🔄 Helper Function: Force Subscribe Checker
+async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
+    unjoined_buttons = []
+    
+    # 4 potential channel keys saved in DB/Settings
+    for i in range(1, 5):
+        channel_url = settings.get(f"fsub_{i}") or getattr(config, f"FSUB_CHANNEL_{i}", None)
+        if not channel_url or "your_channel" in channel_url:
+            continue
+        
+        # Extract channel username or ID
+        chat_identifier = channel_url.split("/")[-1].replace("@", "").strip()
+        if not chat_identifier:
+            continue
+
+        try:
+            member = await bot.get_chat_member(chat_identifier, user_id)
+            if member.status in ["kicked", "left"]:
+                unjoined_buttons.append([InlineKeyboardButton(f"📢 Join Channel {i}", url=channel_url)])
+        except (UserNotParticipant, ChatAdminRequired, PeerIdInvalid, Exception):
+            unjoined_buttons.append([InlineKeyboardButton(f"📢 Join Channel {i}", url=channel_url)])
+
+    return unjoined_buttons
+
+
 # 🔄 Auto Delete Handler Task
 async def auto_delete_messages(bot: Client, chat_id: int, message_ids: list, delay: int, param: str):
     await asyncio.sleep(delay)
@@ -38,7 +64,7 @@ async def auto_delete_messages(bot: Client, chat_id: int, message_ids: list, del
         bot_username = getattr(config, "BOT_USERNAME", "vj_post_search_bot")
         get_again_url = f"https://t.me/{bot_username}?start={param}"
 
-        # Permanent Message - Sirf 'Get File Again' Button ke sath (Yeh Delete Nahi Hoga)
+        # Permanent Message - Sirf 'Get File Again' Button ke sath
         await bot.send_message(
             chat_id=chat_id,
             text="🗑️ **Your files have been auto-deleted to protect content rights.**\n\nIf you want the files again, click the button below!",
@@ -50,16 +76,16 @@ async def auto_delete_messages(bot: Client, chat_id: int, message_ids: list, del
     except Exception as e:
         await send_error_log(bot, e, "Auto Delete Task Failed")
 
+
 @Client.on_message(filters.command("start") & filters.private)
 async def start_handler(bot: Client, message: Message):
     try:
         user_id = message.from_user.id
         s = await get_settings()
 
-        # ✅ Check & Register User in DB (returns True only for NEW users)
+        # ✅ Check & Register User in DB
         is_new = await add_user(user_id, message.from_user.first_name)
 
-        # ✅ Sirf NAYE Registration par hi Log Channel me message jayega
         if is_new:
             await send_log(
                 bot, 
@@ -77,7 +103,23 @@ async def start_handler(bot: Client, message: Message):
                 f"💬 Contact support if you think this is a mistake."
             )
 
-        # 1. Normal /start Command (Without parameters)
+        # 1. FORCE SUBSCRIBE CHECK
+        unjoined_buttons = await check_fsub_channels(bot, user_id, s)
+        if unjoined_buttons:
+            param_str = message.command[1] if len(message.command) > 1 else ""
+            bot_username = getattr(config, "BOT_USERNAME", message.message_thread_id)
+            try_again_url = f"https://t.me/{bot.me.username}?start={param_str}" if param_str else f"https://t.me/{bot.me.username}?start"
+            
+            unjoined_buttons.append([InlineKeyboardButton("🔄 Try Again", url=try_again_url)])
+            
+            return await message.reply_text(
+                "⚠️ **Force Subscribe Notice!**\n\n"
+                "फाइल्स एक्सेस करने के लिए आपको हमारे स्पॉन्सर चैनल्स को जॉइन करना अनिवार्य है।\n"
+                "नीचे दिए गए चैनल्स जॉइन करें और फिर **Try Again** पर क्लिक करें।",
+                reply_markup=InlineKeyboardMarkup(unjoined_buttons)
+            )
+
+        # 2. Normal /start Command (Without parameters)
         if len(message.command) < 2:
             return await message.reply_text(
                 f"👋 **Hello {message.from_user.first_name}!**\n\n"
@@ -91,11 +133,10 @@ async def start_handler(bot: Client, message: Message):
 
         raw_param = message.command[1]
 
-        # 2. ANTI-BYPASS & TOKEN VERIFICATION HANDLER
+        # 3. ANTI-BYPASS & TOKEN VERIFICATION HANDLER
         if raw_param.startswith("verify_"):
             token_payload = raw_param.replace("verify_", "")
 
-            # Check 1: Check if Token is Already Burned / Used
             if await is_token_burned(token_payload):
                 return await message.reply_text(
                     "❌ **Token Expired or Already Used!**\n\nयह टोकन पहले ही यूज़ या एक्सपायर किया जा चुका है। कृपया नया लिंक जनरेट करें।"
@@ -103,17 +144,14 @@ async def start_handler(bot: Client, message: Message):
 
             token_user_id, target_param, created_at, is_valid = decode_and_verify_payload(token_payload)
 
-            # Check 2: Invalid / Tampered Payload
             if not is_valid:
                 return await message.reply_text("⛔ **Invalid / Tampered Verification Token!**")
 
-            # Check 3: User Lock Check
             if token_user_id != user_id:
                 return await message.reply_text(
                     "⚠️ **Access Denied!**\n\nयह वेरिफिकेशन टोकन किसी और यूज़र का है। आप इसका उपयोग नहीं कर सकते।"
                 )
 
-            # Check 4: Anti-Bypass Time Check (2 Minutes = 120 Seconds Guard)
             time_taken = int(time.time()) - created_at
             if time_taken < 120:
                 await burn_token(token_payload)
@@ -138,7 +176,6 @@ async def start_handler(bot: Client, message: Message):
                     msg_text = random.choice(FUNNY_HACKER_MESSAGES).format(strike=attempts)
                     return await message.reply_text(msg_text)
 
-            # Verification Successful -> Verify User & Burn Token
             verify_hours = s.get("verify_expire_hours", 12)
             await set_user_verified(user_id, hours=verify_hours)
             await burn_token(token_payload)
@@ -152,7 +189,7 @@ async def start_handler(bot: Client, message: Message):
         else:
             param = raw_param
 
-        # 3. Shortener Verification Status Check
+        # 4. Shortener Verification Status Check
         ADMINS = getattr(config, "ADMINS", [])
         is_admin = user_id in ADMINS
         is_verify_enabled = s.get("shortener_verify_enabled", True)
@@ -160,11 +197,9 @@ async def start_handler(bot: Client, message: Message):
         if not is_admin and is_verify_enabled and s.get("shortener_api"):
             is_verified = await is_user_verified(user_id)
             if not is_verified:
-                # Secure HMAC Payload Generation
                 secure_payload = create_secure_payload(user_id, param)
                 raw_verify_link = f"https://t.me/{config.BOT_USERNAME}?start=verify_{secure_payload}"
                 
-                # shortener link call from verification.py
                 short_url = await get_short_url(raw_verify_link)
 
                 btn = InlineKeyboardMarkup([
@@ -178,7 +213,7 @@ async def start_handler(bot: Client, message: Message):
                     reply_markup=btn
                 )
 
-        # 4. Deliver Requested Files Logic (with 1-second delay for FloodWait Protection)
+        # 5. Deliver Requested Files Logic
         sent_messages = []
         is_protect = s.get("protect_content", True)
         status_msg = await message.reply_text("🔄 **Fetching files...**")
@@ -194,7 +229,7 @@ async def start_handler(bot: Client, message: Message):
                     protect_content=is_protect
                 )
                 sent_messages.append(copied.id)
-                await asyncio.sleep(1)  # ⏱️ 1 Second Gap to Prevent FloodWait
+                await asyncio.sleep(1)
 
         elif param.startswith("file_"):
             msg_id = int(param.split("_")[1])
@@ -208,13 +243,12 @@ async def start_handler(bot: Client, message: Message):
 
         await status_msg.delete()
 
-        # 5. Handle Auto-Deletion Task
+        # 6. Handle Auto-Deletion Task
         is_auto_del = s.get("auto_delete_enabled", True)
         del_min = s.get("auto_delete_minutes", 30)
         channel_url = getattr(config, "UPDATES_CHANNEL", "https://t.me/your_channel")
 
         if sent_messages and is_auto_del:
-            # First Notice - With ONLY Updates Channel Button
             del_msg = await message.reply_text(
                 f"⚠️ **Important:**\n\n"
                 f"All Messages will be deleted after **{del_min} minutes**. "
@@ -225,7 +259,6 @@ async def start_handler(bot: Client, message: Message):
             )
             sent_messages.append(del_msg.id)
             
-            # Auto-Delete Task with 'param' to generate 'Get File Again' button later
             asyncio.create_task(auto_delete_messages(bot, user_id, sent_messages, del_min * 60, param))
 
         await send_log(
