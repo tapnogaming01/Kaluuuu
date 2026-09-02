@@ -11,6 +11,7 @@ buffer_col = db['buffers']
 users_col = db['users']
 settings_col = db['bot_settings']
 used_tokens_col = db['used_tokens']  # Used/Burned Tokens for Anti-Bypass
+pending_req_col = db['pending_requests']  # 📩 Pending Join Requests Tracking
 
 # -------------------------------------------------------------
 # 1. Global Settings Control (Supports Dictionary & Key-Value Updates)
@@ -191,3 +192,19 @@ async def burn_token(encoded_payload: str):
         "token": encoded_payload,
         "burned_at": datetime.now(timezone.utc)
     })
+
+# -------------------------------------------------------------
+# 7. Pending Join Request Tracking (Approval Link Feature)
+# -------------------------------------------------------------
+async def add_pending_request(user_id: int, chat_id: int):
+    """जब कोई यूज़र प्राइवेट चैनल में Approval Request भेजेगा तो DB में रिकॉर्ड सेव होगा"""
+    await pending_req_col.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"chat_ids": chat_id}},
+        upsert=True
+    )
+
+async def is_request_pending(user_id: int, chat_id: int) -> bool:
+    """चेक करता है कि क्या यूज़र ने संबंधित चैनल के लिए Request भेज रखी है"""
+    req = await pending_req_col.find_one({"user_id": user_id, "chat_ids": chat_id})
+    return bool(req)
