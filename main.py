@@ -27,8 +27,9 @@ async def start_web_server():
     await site.start()
     print(f"🌐 Web Server listening on port {config.PORT}")
 
+# 🔄 Session Name updated to "MultiStoryBot_v2" to fix USER_MIGRATE_303 error
 bot = Client(
-    "MultiStoryBot",
+    "MultiStoryBot_v2",
     api_id=config.API_ID,
     api_hash=config.API_HASH,
     bot_token=config.BOT_TOKEN,
