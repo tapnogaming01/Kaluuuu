@@ -32,3 +32,5 @@ SHORTENER_API = os.environ.get("SHORTENER_API", "")
 
 # Anti-Bypass Security Credentials
 SECRET_KEY = os.environ.get("SECRET_KEY", "Kaluu_Secret_Key_2026") # यहाँ अपना नाम या Secret Key डाल सकते हैं
+# update channel 
+UPDATES_CHANNEL = "https://t.me/freestoryhubMR"  
