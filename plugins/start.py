@@ -116,8 +116,8 @@ async def start_handler(bot: Client, message: Message):
             return await message.reply_text(
                 Script.START_TXT.format(first_name=message.from_user.first_name),
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/your_channel"))],
-                    [InlineKeyboardButton("❓ ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/your_support")]
+                    [InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/pratilipifm0900"))],
+                    [InlineKeyboardButton("❓ ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/pratilipifm0900")]
                 ])
             )
 
