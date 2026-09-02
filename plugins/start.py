@@ -28,16 +28,25 @@ FUNNY_HACKER_MESSAGES = [
     "🤖 **SYSTEM ALERT: Bypasser Spotted!** 🎯\n\n2 मिनट का रास्ता 5 सेकंड में? उड़ के गए थे क्या? ✈️\nना ना ना! चीटिंग नहीं चलेगी। टोकन Expire कर दिया गया है! 🚫\n*(Strike {strike}/3: सावधान रहें!)*"
 ]
 
-async def auto_delete_messages(bot: Client, chat_id: int, message_ids: list, delay: int):
+# 🔄 Auto Delete Handler Task
+async def auto_delete_messages(bot: Client, chat_id: int, message_ids: list, delay: int, param: str):
     await asyncio.sleep(delay)
     try:
+        # Files aur Notice message ko delete karna
         await bot.delete_messages(chat_id=chat_id, message_ids=message_ids)
-        warning = await bot.send_message(
+        
+        bot_username = getattr(config, "BOT_USERNAME", "vj_post_search_bot")
+        get_again_url = f"https://t.me/{bot_username}?start={param}"
+
+        # Permanent Message - Sirf 'Get File Again' Button ke sath (Yeh Delete Nahi Hoga)
+        await bot.send_message(
             chat_id=chat_id,
-            text="🗑️ **Your files have been auto-deleted to protect content rights.**\nClick the link again if you need them!"
+            text="🗑️ **Your files have been auto-deleted to protect content rights.**\n\nIf you want the files again, click the button below!",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Get File Again", url=get_again_url)]
+            ])
         )
-        await asyncio.sleep(10)
-        await warning.delete()
+
     except Exception as e:
         await send_error_log(bot, e, "Auto Delete Task Failed")
 
@@ -75,7 +84,7 @@ async def start_handler(bot: Client, message: Message):
                 "Welcome to the **Audio Story File Store Bot**.\n"
                 "Click episode buttons in the channel to get your audio files.",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 Updates Channel", url="https://t.me/your_channel")],
+                    [InlineKeyboardButton("📢 Updates Channel", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/your_channel"))],
                     [InlineKeyboardButton("❓ Support", url="https://t.me/your_support")]
                 ])
             )
@@ -169,7 +178,7 @@ async def start_handler(bot: Client, message: Message):
                     reply_markup=btn
                 )
 
-        # 4. Deliver Requested Files Logic
+        # 4. Deliver Requested Files Logic (with 1-second delay for FloodWait Protection)
         sent_messages = []
         is_protect = s.get("protect_content", True)
         status_msg = await message.reply_text("🔄 **Fetching files...**")
@@ -185,6 +194,7 @@ async def start_handler(bot: Client, message: Message):
                     protect_content=is_protect
                 )
                 sent_messages.append(copied.id)
+                await asyncio.sleep(1)  # ⏱️ 1 Second Gap to Prevent FloodWait
 
         elif param.startswith("file_"):
             msg_id = int(param.split("_")[1])
@@ -200,14 +210,23 @@ async def start_handler(bot: Client, message: Message):
 
         # 5. Handle Auto-Deletion Task
         is_auto_del = s.get("auto_delete_enabled", True)
-        del_min = s.get("auto_delete_minutes", 5)
+        del_min = s.get("auto_delete_minutes", 30)
+        channel_url = getattr(config, "UPDATES_CHANNEL", "https://t.me/your_channel")
 
         if sent_messages and is_auto_del:
+            # First Notice - With ONLY Updates Channel Button
             del_msg = await message.reply_text(
-                f"⚠️ **Notice:** These files will automatically be deleted in **{del_min} Minutes** to protect content rights."
+                f"⚠️ **Important:**\n\n"
+                f"All Messages will be deleted after **{del_min} minutes**. "
+                f"Please save or forward these messages to your personal saved messages to avoid losing them!",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📢 Updates Channel", url=channel_url)]
+                ])
             )
             sent_messages.append(del_msg.id)
-            asyncio.create_task(auto_delete_messages(bot, user_id, sent_messages, del_min * 60))
+            
+            # Auto-Delete Task with 'param' to generate 'Get File Again' button later
+            asyncio.create_task(auto_delete_messages(bot, user_id, sent_messages, del_min * 60, param))
 
         await send_log(
             bot,
