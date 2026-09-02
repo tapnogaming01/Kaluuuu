@@ -75,7 +75,7 @@ async def source_channel_handler(bot: Client, message: Message):
             batch_link = f"https://t.me/{config.BOT_USERNAME}?start=file_{saved_msg.id}"
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton(f"🎧 Listen Eps {start_ep}-{end_ep} ↗️", url=batch_link)],
-                [InlineKeyboardButton("TUTORIAL ↗️", url="https://t.me/your_tutorial"), InlineKeyboardButton("HELP ↗️", url="https://t.me/your_help")]
+                [InlineKeyboardButton("TUTORIAL ↗️", url="https://t.me/howanubhav/14"), InlineKeyboardButton("HELP ↗️", url="https://t.me/pratilipifm0900")]
             ])
             try:
                 await bot.send_message(
