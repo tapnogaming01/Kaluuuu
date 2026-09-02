@@ -57,9 +57,9 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
         try:
             member = await bot.get_chat_member(chat_id=chat_identifier, user_id=user_id)
             if member.status in ["left", "kicked"]:
-                unjoined_buttons.append([InlineKeyboardButton(f"📢 Join Channel {i}", url=channel_val if "http" in channel_val else f"https://t.me/{chat_identifier.replace('@','')}")])
+                unjoined_buttons.append([InlineKeyboardButton(f"📢 ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ {i}", url=channel_val if "http" in channel_val else f"https://t.me/{chat_identifier.replace('@','')}")])
         except UserNotParticipant:
-            unjoined_buttons.append([InlineKeyboardButton(f"📢 Join Channel {i}", url=channel_val if "http" in channel_val else f"https://t.me/{chat_identifier.replace('@','')}")])
+            unjoined_buttons.append([InlineKeyboardButton(f"📢 ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ {i}", url=channel_val if "http" in channel_val else f"https://t.me/{chat_identifier.replace('@','')}")])
         except Exception:
             pass
 
@@ -78,7 +78,7 @@ async def auto_delete_messages(bot: Client, chat_id: int, message_ids: list, del
             chat_id=chat_id,
             text=Script.AUTO_DEL_DONE_TXT,
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Get File Again", url=get_again_url)]
+                [InlineKeyboardButton("🔄 ɢᴇᴛ ꜰɪʟᴇ ᴀɢᴀɪɴ", url=get_again_url)]
             ])
         )
     except Exception as e:
@@ -108,7 +108,7 @@ async def start_handler(bot: Client, message: Message):
         unjoined_buttons = await check_fsub_channels(bot, user_id, s)
         if unjoined_buttons:
             param_str = message.command[1] if len(message.command) > 1 else "none"
-            unjoined_buttons.append([InlineKeyboardButton("🔄 Try Again", callback_data=f"check_fsub#{param_str}")])
+            unjoined_buttons.append([InlineKeyboardButton("🔄 ᴛʀʏ ᴀɢᴀɪɴ", callback_data=f"check_fsub#{param_str}")])
             return await message.reply_text(Script.FSUB_TXT, reply_markup=InlineKeyboardMarkup(unjoined_buttons))
 
         # 2. Normal /start Command
@@ -116,8 +116,8 @@ async def start_handler(bot: Client, message: Message):
             return await message.reply_text(
                 Script.START_TXT.format(first_name=message.from_user.first_name),
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 Updates Channel", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/your_channel"))],
-                    [InlineKeyboardButton("❓ Support", url="https://t.me/your_support")]
+                    [InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ", url=getattr(config, "UPDATES_CHANNEL", "https://t.me/your_channel"))],
+                    [InlineKeyboardButton("❓ ꜱᴜᴘᴘᴏʀᴛ", url="https://t.me/your_support")]
                 ])
             )
 
@@ -133,10 +133,10 @@ async def start_handler(bot: Client, message: Message):
             token_user_id, target_param, created_at, is_valid = decode_and_verify_payload(token_payload)
 
             if not is_valid:
-                return await message.reply_text("⛔ **Invalid / Tampered Verification Token!**")
+                return await message.reply_text("⛔ **ɪɴᴠᴀʟɪᴅ / ᴛᴀᴍᴘᴇʀᴇᴅ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ᴛᴏᴋᴇɴ!**")
 
             if token_user_id != user_id:
-                return await message.reply_text("⚠️ **Access Denied!**\n\nयह वेरिफिकेशन टोकन किसी और यूज़र का है।")
+                return await message.reply_text("⚠️ **ᴀᴄᴄᴇꜱꜱ ᴅᴇɴɪᴇᴅ!**\n\nᴛʜɪꜱ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ᴛᴏᴋᴇɴ ʙᴇʟᴏɴɢꜱ ᴛᴏ ᴀɴᴏᴛʜᴇʀ ᴜꜱᴇʀ.")
 
             time_taken = int(time.time()) - created_at
             if time_taken < 120:
@@ -149,7 +149,7 @@ async def start_handler(bot: Client, message: Message):
                         bot, 
                         f"🚨 **USER AUTO-BANNED!**\nUser: {message.from_user.mention} (`{user_id}`)\nReason: Completed shortener in `{time_taken}s`."
                     )
-                    return await message.reply_text("⛔ **YOU HAVE BEEN BANNED!**\n\nआप 3 बार बाईपास करते हुए पकड़े गए हैं।")
+                    return await message.reply_text("⛔ **ʏᴏᴜ ʜᴀᴠᴇ ʙᴇᴇɴ ʙᴀɴɴᴇᴅ!**\n\nʏᴏᴜ ʜᴀᴠᴇ ʙᴇᴇɴ ᴄᴀᴜɢʜᴛ ʙʏᴘᴀꜱꜱɪɴɢ 3 ᴛɪᴍᴇꜱ.")
                 else:
                     await send_log(bot, f"⚠️ **Bypass Attempt Blocked:** {message.from_user.mention} (`{user_id}`) in `{time_taken}s` | Strike `{attempts}/3`")
                     msg_text = random.choice(Script.FUNNY_HACKER_MESSAGES).format(strike=attempts)
@@ -177,9 +177,12 @@ async def start_handler(bot: Client, message: Message):
                 raw_verify_link = f"https://t.me/{config.BOT_USERNAME}?start=verify_{secure_payload}"
                 short_url = await get_short_url(raw_verify_link)
 
+                BUY_STORE_URL = "http://t.me/storysellerbyACbot/Store"
+
                 btn = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔓 Verify Access (Click Here)", url=str(short_url))],
-                    [InlineKeyboardButton("❓ How to Verify", url="https://t.me/your_tutorial")]
+                    [InlineKeyboardButton("🔓 ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ᴀᴄᴄᴇꜱꜱ (ᴄʟɪᴄᴋ ʜᴇʀᴇ)", url=str(short_url))],
+                    [InlineKeyboardButton("🛒 ʙᴜʏ ꜱᴛᴏʀʏ (ᴊᴜꜱᴛ ₹1 - ₹5)", url=BUY_STORE_URL)],
+                    [InlineKeyboardButton("❓ ʜᴏᴡ ᴛᴏ ᴠᴇʀɪꜰʏ", url="https://t.me/your_tutorial")]
                 ])
                 return await message.reply_text(
                     Script.VERIFY_REQ_TXT.format(expire_hours=s.get('verify_expire_hours', 12)),
@@ -191,7 +194,7 @@ async def start_handler(bot: Client, message: Message):
 
     except Exception as e:
         await send_error_log(bot, e, f"Start Handler Error: {message.text}")
-        await message.reply_text("❌ An error occurred while fetching your files.")
+        await message.reply_text("❌ ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ ᴡʜɪʟᴇ ꜰᴇᴛᴄʜɪɴɢ ʏᴏᴜʀ ꜰɪʟᴇꜱ.")
 
 
 # 🔄 Updated File Delivery Helper with Developer & Cancel Support
@@ -201,10 +204,10 @@ async def process_file_delivery(bot: Client, message: Message, param: str, setti
     is_protect = settings.get("protect_content", True)
     
     # Buttons Structure
-    dev_url = "https://t.me/Kaluu"
+    dev_url = "https://t.me/kcxry"
     wait_buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("👑 DEVELOPER", url=dev_url)],
-        [InlineKeyboardButton("❌ CANCEL", callback_data=f"cancel_dl#{user_id}")]
+        [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url=dev_url)],
+        [InlineKeyboardButton("❌ ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_dl#{user_id}")]
     ])
 
     status_msg = await message.reply_text(
@@ -266,7 +269,7 @@ async def process_file_delivery(bot: Client, message: Message, param: str, setti
         del_msg = await message.reply_text(
             Script.AUTO_DEL_WARN_TXT.format(del_min=del_min),
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📢 Updates Channel", url=channel_url)]
+                [InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ ᴄʜᴀɴɴᴇʟ", url=channel_url)]
             ])
         )
         sent_messages.append(del_msg.id)
@@ -289,14 +292,14 @@ async def check_fsub_callback(bot: Client, query: CallbackQuery):
     unjoined_buttons = await check_fsub_channels(bot, user_id, s)
     
     if unjoined_buttons:
-        await query.answer("❌ आपने अभी भी सभी चैनल्स जॉइन नहीं किए हैं!", show_alert=True)
-        unjoined_buttons.append([InlineKeyboardButton("🔄 Try Again", callback_data=f"check_fsub#{param}")])
+        await query.answer("❌ ʏᴏᴜ ʜᴀᴠᴇ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴀʟʟ ᴄʜᴀɴɴᴇʟꜱ ʏᴇᴛ!", show_alert=True)
+        unjoined_buttons.append([InlineKeyboardButton("🔄 ᴛʀʏ ᴀɢᴀɪɴ", callback_data=f"check_fsub#{param}")])
         try:
             await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(unjoined_buttons))
         except Exception:
             pass
     else:
-        await query.answer("✅ सभी चैनल्स सफलतापूर्वक जॉइन हो चुके हैं!", show_alert=False)
+        await query.answer("✅ ᴀʟʟ ᴄʜᴀɴɴᴇʟꜱ ᴊᴏɪɴᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!", show_alert=False)
         await query.message.delete()
         
         if param != "none":
@@ -313,7 +316,7 @@ async def cancel_delivery_callback(bot: Client, query: CallbackQuery):
     target_user_id = int(query.data.split("#")[1])
 
     if query.from_user.id != target_user_id:
-        return await query.answer("⚠️ यह बटन आपके लिए नहीं है!", show_alert=True)
+        return await query.answer("⚠️ ᴛʜɪꜱ ʙᴜᴛᴛᴏɴ ɪꜱ ɴᴏᴛ ꜰᴏʀ ʏᴏᴜ!", show_alert=True)
 
     CANCEL_TASKS[target_user_id] = True
-    await query.answer("🛑 फाइल डिलीवरी रोकी जा रही है...", show_alert=False)
+    await query.answer("🛑 ꜱᴛᴏᴘᴘɪɴɢ ꜰɪʟᴇ ᴅᴇʟɪᴠᴇʀʏ...", show_alert=False)
