@@ -13,7 +13,7 @@ settings_col = db['bot_settings']
 used_tokens_col = db['used_tokens']  # Used/Burned Tokens for Anti-Bypass
 
 # -------------------------------------------------------------
-# 1. Global Settings Control
+# 1. Global Settings Control (Supports Dictionary & Key-Value Updates)
 # -------------------------------------------------------------
 async def get_settings():
     settings = await settings_col.find_one({"id": "global_settings"})
@@ -26,26 +26,40 @@ async def get_settings():
             "shortener_verify_enabled": getattr(config, "SHORTENER_VERIFY_ENABLED", True),
             "verify_expire_hours": getattr(config, "VERIFY_EXPIRE_HOURS", 12),
             "shortener_url": getattr(config, "SHORTENER_URL", "gplinks.in"),
-            "shortener_api": getattr(config, "SHORTENER_API", "")
+            "shortener_api": getattr(config, "SHORTENER_API", ""),
+            "fsub_1": getattr(config, "FSUB_CHANNEL_1", "https://t.me/your_channel"),
+            "fsub_2": getattr(config, "FSUB_CHANNEL_2", "https://t.me/your_channel"),
+            "fsub_3": getattr(config, "FSUB_CHANNEL_3", "https://t.me/your_channel"),
+            "fsub_4": getattr(config, "FSUB_CHANNEL_4", "https://t.me/your_channel")
         }
         await settings_col.insert_one(default_data)
         return default_data
     return settings
 
-async def update_settings(key: str, value):
+async def update_settings(data, value=None):
+    """
+    अपडेटेड फ़ंक्शन:
+    1. update_settings({"fsub_1": "link"}) -> Dict फ़ॉर्मैट को सपोर्ट करता है।
+    2. update_settings("fsub_1", "link") -> Single Key-Value फ़ॉर्मैट को सपोर्ट करता है।
+    """
+    if isinstance(data, dict):
+        update_dict = data
+    else:
+        update_dict = {data: value}
+
     await settings_col.update_one(
         {"id": "global_settings"},
-        {"$set": {key: value}},
+        {"$set": update_dict},
         upsert=True
     )
 
 # -------------------------------------------------------------
-# 2. User & Verification System (Fixes ImportError & Log Notice)
+# 2. User & Verification System
 # -------------------------------------------------------------
 async def add_user(user_id: int, name: str) -> bool:
     """
     यूज़र को ऐड करता है। 
-    अगर नया यूज़र है तो True रिटर्न करेगा (ताकि Log Channel में मैसेज जाए),
+    अगर नया यूज़र है तो True रिटर्न करेगा,
     और अगर पुराना यूज़र है तो False रिटर्न करेगा।
     """
     user = await users_col.find_one({"user_id": user_id})
