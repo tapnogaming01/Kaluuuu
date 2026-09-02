@@ -5,6 +5,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 import config
 from database import (
+    add_user,  # ✅ DB check & add user function
     get_settings, 
     is_user_banned, 
     increment_bypass_count, 
@@ -15,7 +16,6 @@ from database import (
     burn_token
 )
 from helpers.logger import send_log, send_error_log
-# ✅ Sabhi verification & shortener functions ab verification.py se import ho rahe hain
 from helpers.verification import (
     get_shortlink as get_short_url, 
     create_secure_payload, 
@@ -47,6 +47,18 @@ async def start_handler(bot: Client, message: Message):
         user_id = message.from_user.id
         s = await get_settings()
 
+        # ✅ Check & Register User in DB (returns True only for NEW users)
+        is_new = await add_user(user_id, message.from_user.first_name)
+
+        # ✅ Sirf NAYE Registration par hi Log Channel me message jayega
+        if is_new:
+            await send_log(
+                bot, 
+                f"🆕 **New User Registered!**\n"
+                f"👤 **Name:** {message.from_user.mention}\n"
+                f"🆔 **ID:** `{user_id}`"
+            )
+
         # 0. Global Ban Check
         banned, reason = await is_user_banned(user_id)
         if banned:
@@ -56,9 +68,8 @@ async def start_handler(bot: Client, message: Message):
                 f"💬 Contact support if you think this is a mistake."
             )
 
-        # 1. Normal /start Command
+        # 1. Normal /start Command (Without parameters)
         if len(message.command) < 2:
-            await send_log(bot, f"👤 **New User Started Bot:** {message.from_user.mention} (`{user_id}`)")
             return await message.reply_text(
                 f"👋 **Hello {message.from_user.first_name}!**\n\n"
                 "Welcome to the **Audio Story File Store Bot**.\n"
@@ -140,7 +151,7 @@ async def start_handler(bot: Client, message: Message):
         if not is_admin and is_verify_enabled and s.get("shortener_api"):
             is_verified = await is_user_verified(user_id)
             if not is_verified:
-                # Secure HMAC Payload Generetion
+                # Secure HMAC Payload Generation
                 secure_payload = create_secure_payload(user_id, param)
                 raw_verify_link = f"https://t.me/{config.BOT_USERNAME}?start=verify_{secure_payload}"
                 
