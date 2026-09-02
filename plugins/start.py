@@ -28,7 +28,7 @@ from helpers.verification import (
 CANCEL_TASKS = {}
 
 
-# 🔄 Helper Function: Robust Force Subscribe Checker (Public & Private Supported)
+# 🔄 Helper Function: Force Subscribe Checker with Approval Link Support
 async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
     unjoined_buttons = []
     
@@ -57,18 +57,23 @@ async def check_fsub_channels(bot: Client, user_id: int, settings: dict):
         if not chat_identifier:
             continue
 
-        # 2. Join Link Generator (Private vs Public Support)
+        # 2. Join Link Generator (Approval / Join Request Link Support)
         join_url = None
         if isinstance(chat_identifier, int) or (isinstance(channel_val, str) and channel_val.startswith("-100")):
             try:
-                chat_info = await bot.get_chat(chat_identifier)
-                if chat_info.invite_link:
-                    join_url = chat_info.invite_link
-                else:
-                    join_url = await bot.export_chat_invite_link(chat_identifier)
+                # 🛑 creates_join_request=True से Approval Invite Link जनरेट होगी
+                invite_link_obj = await bot.create_chat_invite_link(
+                    chat_id=chat_identifier,
+                    creates_join_request=True
+                )
+                join_url = invite_link_obj.invite_link
             except Exception as e:
-                print(f"⚠️ Failed to export invite link for {chat_identifier}: {e}")
-                join_url = "https://t.me/"
+                print(f"⚠️ Approval Invite Link Error (Channel {i}): {e}")
+                try:
+                    chat_info = await bot.get_chat(chat_identifier)
+                    join_url = chat_info.invite_link or await bot.export_chat_invite_link(chat_identifier)
+                except Exception:
+                    join_url = "https://t.me/"
         elif "http" in channel_val:
             join_url = channel_val
         else:
@@ -249,7 +254,7 @@ async def process_file_delivery(bot: Client, message: Message, param: str, setti
     sent_messages = []
     is_protect = settings.get("protect_content", True)
     
-    dev_url = "https://t.me/Kaluu"
+    dev_url = "https://t.me/KCXRY"
     wait_buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url=dev_url)],
         [InlineKeyboardButton("❌ ᴄᴀɴᴄᴇʟ", callback_data=f"cancel_dl#{user_id}")]
@@ -334,7 +339,7 @@ async def navigation_callbacks(bot: Client, query: CallbackQuery):
 
     elif data == "about_btn":
         btn = InlineKeyboardMarkup([
-            [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/Kaluu")],
+            [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/KCXRY")],
             [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start")]
         ])
         await query.message.edit_text(Script.ABOUT_TXT, reply_markup=btn, disable_web_page_preview=True)
@@ -373,7 +378,7 @@ async def check_fsub_callback(bot: Client, query: CallbackQuery):
         except Exception:
             pass
     else:
-        await query.answer("✅ ᴀʟʟ ᴄʜᴀɴɴᴇʟꜱ ᴊᴏɪɴᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!", show_alert=False)
+        await query.answer("✅ ᴀʟʟ ᴄʜᴀɴɴᴇʟꜱ ᴊᴏɪɴ ʀᴇQᴜᴇꜱᴛ ꜱᴇɴᴛ / ᴊᴏɪɴᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ!", show_alert=False)
         await query.message.delete()
         
         if param != "none":
