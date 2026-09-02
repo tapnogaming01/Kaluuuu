@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, LinkPreviewOptions
 import config
 from database import (
     get_settings, update_settings,
@@ -7,6 +7,28 @@ from database import (
 )
 
 admin_filter = filters.user(config.ADMINS)
+
+
+# -------------------------------------------------------------
+# Helper Function: URL Sanitizer to Prevent 400 BUTTON_URL_INVALID Error
+# -------------------------------------------------------------
+def safe_url(url: str) -> str:
+    """सुनिश्चित करता है कि बटन URL हमेशा 'https://' से शुरू हो और खाली न हो।"""
+    if not url or not isinstance(url, str):
+        return "https://t.me/"
+    
+    clean_url = url.strip()
+    if not clean_url or "your_channel" in clean_url:
+        return "https://t.me/"
+    
+    if clean_url.startswith("@"):
+        return f"https://t.me/{clean_url.replace('@', '')}"
+        
+    if not clean_url.startswith(("http://", "https://")):
+        return f"https://{clean_url}"
+        
+    return clean_url
+
 
 # Helper function: Settings UI & Inline Buttons Generator
 async def build_settings_panel():
@@ -17,13 +39,13 @@ async def build_settings_panel():
     autodel_btn_status = "🟢 ON" if s.get("auto_delete_enabled", True) else "🔴 OFF"
     protect_btn_status = "🟢 ON" if s.get("protect_content", True) else "🔴 OFF"
 
-    # Dynamic Channels Link from DB
-    fsub1 = s.get("fsub_1", getattr(config, "FSUB_CHANNEL_1", "https://t.me/your_channel"))
-    fsub2 = s.get("fsub_2", getattr(config, "FSUB_CHANNEL_2", "https://t.me/your_channel"))
-    fsub3 = s.get("fsub_3", getattr(config, "FSUB_CHANNEL_3", "https://t.me/your_channel"))
-    fsub4 = s.get("fsub_4", getattr(config, "FSUB_CHANNEL_4", "https://t.me/your_channel"))
+    # Dynamic Channels Link from DB (Validated with safe_url)
+    fsub1 = safe_url(s.get("fsub_1") or getattr(config, "FSUB_CHANNEL_1", "https://t.me/"))
+    fsub2 = safe_url(s.get("fsub_2") or getattr(config, "FSUB_CHANNEL_2", "https://t.me/"))
+    fsub3 = safe_url(s.get("fsub_3") or getattr(config, "FSUB_CHANNEL_3", "https://t.me/"))
+    fsub4 = safe_url(s.get("fsub_4") or getattr(config, "FSUB_CHANNEL_4", "https://t.me/"))
 
-    # Clean UI Text Matching Screenshot Style
+    # Clean UI Text
     text = (
         "⚡ **HERE IS THE SETTINGS MENU** ⚡\n"
         "_________________________________________\n\n"
@@ -65,7 +87,11 @@ async def build_settings_panel():
 @Client.on_message(filters.command("settings") & admin_filter)
 async def settings_cmd(bot: Client, message: Message):
     text, markup = await build_settings_panel()
-    await message.reply_text(text, reply_markup=markup, disable_web_page_preview=True)
+    await message.reply_text(
+        text, 
+        reply_markup=markup, 
+        link_preview_options=LinkPreviewOptions(is_disabled=True)
+    )
 
 
 @Client.on_callback_query(filters.regex("^adm_"))
@@ -96,7 +122,11 @@ async def admin_settings_callback(bot: Client, query: CallbackQuery):
 
     # Real-time Button Refresh
     text, markup = await build_settings_panel()
-    await query.message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
+    await query.message.edit_text(
+        text, 
+        reply_markup=markup, 
+        link_preview_options=LinkPreviewOptions(is_disabled=True)
+    )
 
 
 # ==========================================
@@ -154,7 +184,8 @@ async def list_stories_cmd(bot: Client, message: Message):
 async def set_fsub_channels_cmd(bot: Client, message: Message):
     try:
         cmd = message.command[0]
-        url = message.text.split(" ", 1)[1].strip()
+        raw_url = message.text.split(" ", 1)[1].strip()
+        url = safe_url(raw_url)
         num = cmd.replace("setfsub", "")
         key = f"fsub_{num}"
 
