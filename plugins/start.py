@@ -12,8 +12,8 @@ from database import (
     is_user_banned, 
     increment_bypass_count, 
     ban_user,
-    is_user_verified,
-    set_user_verified,
+    get_user_verification_status,
+    set_user_slot_verified,
     is_token_burned,
     burn_token,
     add_pending_request,
@@ -179,7 +179,7 @@ async def start_handler(bot: Client, message: Message):
 
         raw_param = message.command[1]
 
-        # 3. Verification Handler
+        # 3. Dynamic 3-Slots Verification Handler
         if raw_param.startswith("verify_"):
             token_payload = raw_param.replace("verify_", "")
 
@@ -211,39 +211,58 @@ async def start_handler(bot: Client, message: Message):
                     msg_text = random.choice(Script.FUNNY_HACKER_MESSAGES).format(strike=attempts)
                     return await message.reply_text(msg_text)
 
-            verify_hours = s.get("verify_expire_hours", 12)
-            await set_user_verified(user_id, hours=verify_hours)
+            # Slot verification status fetch
+            v_status = await get_user_verification_status(user_id)
+            current_slot = v_status.get("next_slot", 1) or 1
+            
+            # Set time dynamically based on the verified slot
+            await set_user_slot_verified(user_id, current_slot)
             await burn_token(token_payload)
-            await send_log(bot, f"✅ **User Verified:** {message.from_user.mention} (`{user_id}`) in `{time_taken}s`.")
+            
+            slot_time = s.get(f"v{current_slot}_time", "12h")
+            await send_log(bot, f"✅ **User Verified Slot {current_slot}:** {message.from_user.mention} (`{user_id}`) in `{time_taken}s`.")
             
             param = target_param
-            await message.reply_text(Script.VERIFY_SUCCESS_TXT.format(hours=verify_hours))
+            
+            # Fetch message dynamically from script.py
+            success_txt = getattr(Script, f"VERIFY_SUCCESS_TXT_{current_slot}", Script.VERIFY_SUCCESS_TXT_1)
+            await message.reply_text(success_txt.format(hours=slot_time))
         else:
             param = raw_param
 
-        # 4. Shortener Verification Check
+        # 4. Shortener Verification Check (3-Step Check)
         ADMINS = getattr(config, "ADMINS", [])
         is_admin = user_id in ADMINS
-        is_verify_enabled = s.get("shortener_verify_enabled", True)
 
-        if not is_admin and is_verify_enabled and s.get("shortener_api"):
-            is_verified = await is_user_verified(user_id)
-            if not is_verified:
-                secure_payload = create_secure_payload(user_id, param)
-                raw_verify_link = f"https://t.me/{config.BOT_USERNAME}?start=verify_{secure_payload}"
-                short_url = await get_short_url(raw_verify_link)
+        if not is_admin:
+            v_status = await get_user_verification_status(user_id)
+            
+            if not v_status.get("is_fully_verified", False):
+                next_slot = v_status.get("next_slot", 1)
+                
+                shortener_url = s.get(f"v{next_slot}_url")
+                shortener_api = s.get(f"v{next_slot}_api")
+                tutorial_url = s.get(f"v{next_slot}_tutorial") or "https://t.me/your_tutorial"
+                slot_time = s.get(f"v{next_slot}_time", "12h")
 
-                BUY_STORE_URL = "http://t.me/storysellerbyACbot/Store"
+                if shortener_url and shortener_api:
+                    secure_payload = create_secure_payload(user_id, param)
+                    raw_verify_link = f"https://t.me/{config.BOT_USERNAME}?start=verify_{secure_payload}"
+                    short_url = await get_short_url(raw_verify_link, shortener_url, shortener_api)
 
-                btn = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔓 ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ᴀᴄᴄᴇꜱꜱ (ᴄʟɪᴄᴋ ʜᴇʀᴇ)", url=str(short_url))],
-                    [InlineKeyboardButton("🛒 ʙᴜʏ ꜱᴛᴏʀʏ (ᴊᴜꜱᴛ ₹1 - ₹5)", url=BUY_STORE_URL)],
-                    [InlineKeyboardButton("❓ ʜᴏᴡ ᴛᴏ ᴠᴇʀɪꜰʏ", url="https://t.me/your_tutorial")]
-                ])
-                return await message.reply_text(
-                    Script.VERIFY_REQ_TXT.format(expire_hours=s.get('verify_expire_hours', 12)),
-                    reply_markup=btn
-                )
+                    BUY_STORE_URL = "http://t.me/storysellerbyACbot/Store"
+
+                    btn = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(f"🔓 ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ {next_slot} (ᴄʟɪᴄᴋ ʜᴇʀᴇ)", url=str(short_url))],
+                        [InlineKeyboardButton("🛒 ʙᴜʏ ꜱᴛᴏʀʏ (ᴊᴜꜱᴛ ₹1 - ₹5)", url=BUY_STORE_URL)],
+                        [InlineKeyboardButton("❓ ʜᴏᴡ ᴛᴏ ᴠᴇʀɪꜰʏ", url=tutorial_url)]
+                    ])
+                    
+                    req_txt = getattr(Script, f"VERIFY_REQ_TXT_{next_slot}", Script.VERIFY_REQ_TXT_1)
+                    return await message.reply_text(
+                        req_txt.format(expire_hours=slot_time),
+                        reply_markup=btn
+                    )
 
         # 5. Deliver Files
         await process_file_delivery(bot, message, param, s)
@@ -263,7 +282,7 @@ async def help_handler(bot: Client, message: Message):
 @Client.on_message(filters.command("about") & filters.private)
 async def about_handler(bot: Client, message: Message):
     btn = InlineKeyboardMarkup([
-        [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="https://t.me/KCXRY")],
+        [InlineKeyboardButton("👑 ᴅᴇᴠᴇʟᴏᴘᴇR", url="https://t.me/KCXRY")],
         [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start")]
     ])
     await message.reply_text(Script.ABOUT_TXT, reply_markup=btn, disable_web_page_preview=True)
