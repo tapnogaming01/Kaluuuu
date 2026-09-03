@@ -4,7 +4,7 @@ import os
 API_ID = int(os.environ.get("API_ID", "123456"))
 API_HASH = os.environ.get("API_HASH", "your_api_hash")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "your_bot_token")
-BOT_USERNAME = os.environ.get("BOT_USERNAME", "YourBotUsername")
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "YourBotUsername") # यहाँ अपना Bot Username डालें
 
 # Database & Channel Settings
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb+srv://...")
@@ -30,26 +30,14 @@ PROTECT_CONTENT = os.environ.get("PROTECT_CONTENT", "True").lower() == "true"
 AUTO_DELETE_ENABLED = os.environ.get("AUTO_DELETE_ENABLED", "True").lower() == "true"
 AUTO_DELETE_MINUTES = int(os.environ.get("AUTO_DELETE_MINUTES", "5"))
 
-# Dynamic 3-Slots Shortener & Security Defaults
+# Shortener & Security Settings
 SHORTENER_VERIFY_ENABLED = os.environ.get("SHORTENER_VERIFY_ENABLED", "True").lower() == "true"
-
-# Slot 1 Fallbacks
-V1_URL = os.environ.get("V1_URL", os.environ.get("SHORTENER_URL", "gplinks.in"))
-V1_API = os.environ.get("V1_API", os.environ.get("SHORTENER_API", ""))
-V1_TIME = os.environ.get("V1_TIME", "12h")
-
-# Slot 2 Fallbacks
-V2_URL = os.environ.get("V2_URL", "")
-V2_API = os.environ.get("V2_API", "")
-V2_TIME = os.environ.get("V2_TIME", "12h")
-
-# Slot 3 Fallbacks
-V3_URL = os.environ.get("V3_URL", "")
-V3_API = os.environ.get("V3_API", "")
-V3_TIME = os.environ.get("V3_TIME", "12h")
+VERIFY_EXPIRE_HOURS = int(os.environ.get("VERIFY_EXPIRE_HOURS", "12"))
+SHORTENER_URL = os.environ.get("SHORTENER_URL", "gplinks.in")
+SHORTENER_API = os.environ.get("SHORTENER_API", "")
 
 # Anti-Bypass Security Credentials
-SECRET_KEY = os.environ.get("SECRET_KEY", "Kaluu_Secret_Key_2026")
+SECRET_KEY = os.environ.get("SECRET_KEY", "Kaluu_Secret_Key_2026") # Secret Key
 
 # Updates Channel
 UPDATES_CHANNEL = os.environ.get("UPDATES_CHANNEL", "https://t.me/freestoryhubMR")
